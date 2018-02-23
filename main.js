@@ -63,7 +63,6 @@ function appendButtons(){
             updateLink(tldrs[this.id]);
         }, false);
         a.setAttribute('id', id);
-        console.log(a);
         var saved = GM_getValue(SAVED_IDS, "{}");
         var isSaved = id in JSON.parse(saved);
         if (isSaved){
@@ -77,7 +76,66 @@ function appendButtons(){
     }    
 }
 
+function createPopup(){
+    var div = document.createElement('div');
+    div.setAttribute('class', "modal fade tldr-helper");
+    div.setAttribute('style', "display: none");
+    div.setAttribute('aria-hidden', true);
+    var content = `<div class="modal-dialog modal-dialog-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <div class="modal-header-close">
+                                    <a href="javascript: void 0;" class="c-close c-hide-text" data-dismiss="modal" id="tldr-close">close this window</a>
+                                </div>
+                            </div>
+                            <div class="modal-body">
+                                <div class="interstitial">
+                                    <div class="buttons">
+                                        <a href="/" class="c-btn c-btn-primary">Got It</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+    div.insertAdjacentHTML('beforeend', content);
+    document.body.appendChild(div);
+    document.getElementById('tldr-close').addEventListener("click", function (){
+        hidePopup();
+    }, false);
+    var side = document.getElementsByClassName('side');
+    if (side.length > 0) {
+        var div = `
+        <div class="spacer">
+            <div class="sidebox">
+                <div class="morelink">
+                    <a href="#" target="_top" id="open-tldr">Manage TLDR</a>
+                    <div class="nub"></div>
+                </div>
+            </div>
+        </div>`;
+        side[0].children[1].insertAdjacentHTML('afterend', div);
+        document.getElementById('open-tldr').addEventListener("click", function () {
+            displayPopup();
+        }, false);
+    }
+}
+
+function displayPopup(){
+    var popup = document.getElementsByClassName('tldr-helper')[0];
+    popup.setAttribute('aria-hidden', false);
+    popup.setAttribute('style', 'display: block;');
+    popup.setAttribute('class', "modal fade tldr-helper in");
+}
+
+function hidePopup(){
+    var popup = document.getElementsByClassName('tldr-helper')[0];
+    popup.setAttribute('class', "modal fade tldr-helper");
+    popup.setAttribute('style', "display: none");
+    popup.setAttribute('aria-hidden', true);   
+}
+
 window.addEventListener('load', function() {
     'use strict';
     appendButtons();
+    createPopup();
 }, false);
