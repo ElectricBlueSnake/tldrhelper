@@ -12,8 +12,10 @@
 
 const SAVE_BUTTON = 'save tldr'; 
 const REMOVE_BUTTON = 'remove tldr';
+const POPUP_ID = 'tldr-popup';
 const SAVED_IDS = 'savedIds';
 const SAVED_TLDRS = 'savedTldrs';
+const PRIORITIES = 'priorities';  // stores the order in which subreddits should be displayed
 
 function updateLink(tldr){
     var saved = JSON.parse(GM_getValue(SAVED_IDS, '{}'));
@@ -34,8 +36,46 @@ function updateLink(tldr){
         GM_setValue(SAVED_TLDRS, JSON.stringify(tldrs)); 
         document.getElementById(id).innerHTML = REMOVE_BUTTON;
     }
+    updatePopup();
 }
 
+/** Adds a new subreddit at the bottom of the priorities list if it does not already exist in the priorities array*/
+function addPriority(subreddit){
+	var priorities = JSON.parse(GM_getValue(PRIORITIES, '[]'));
+	if (!priorities.includes(subreddit)){
+		priorities.push(subreddit); 
+	}
+	GM_setValue(PRIORITIES, JSON.stringify(priorities));
+}
+
+/** Moves s1 right before s2 in the priority list */
+function updatePriority(s1, s2){
+	var priorities = JSON.parse(GM_getValue(PRIORITIES, '[]'));
+	var i = priorities.indexOf(s1);
+	var j = priorities.indexOf(s2);
+	if(i != -1 && j != -1 && i > j){
+		priorities.splice(i, 1);
+		priorities.splice(j, 0, s1);
+	}
+	GM_setValue(PRIORITIES, JSON.stringify(priorities));
+}
+
+/** Returns a list with the saved submissiosn in subreddit priority order */
+function sortTldrs(){
+	var tldrs = JSON.parse(GM_getValue(SAVED_TLDRS, '{}'));
+	var priorities = JSON.parse(GM_getValue(PRIORITIES, '[]'));
+	var sorted = [];
+	for (var i = 0; i < priorities.length; i++) {
+		for (var id in tldrs){
+			if (tldrs[id]['subreddit'] == priorities[i]) {
+				sorted.push(tldrs[id]);
+			}
+		}
+	}
+	return sorted;
+}
+
+/** Inserts 'save tldr' / 'remove tldr' buttons near to each reddit link found in the page*/
 function appendButtons(){
     var links = document.getElementsByClassName('link');
     var tldrs = {};
@@ -45,12 +85,14 @@ function appendButtons(){
         if (elems.length < 6) {
             continue;  // Reddit ad, not to be considered
         }
+        var subreddit = elems[4].innerHTML;
+        addPriority(subreddit);
         var tldr = {
             'id': id,
             'title': elems[1].innerHTML,
             'link': elems[1].getAttribute('href'),
             'author': elems[3].innerHTML,
-            'subreddit': elems[4].innerHTML,
+            'subreddit': subreddit,
             'comments': elems[5].getAttribute('href')
         };
         tldrs[id] = tldr;
@@ -76,6 +118,13 @@ function appendButtons(){
     }    
 }
 
+function insertCell(tr, content){
+	var td = tr.insertCell();
+	td.insertAdjacentHTML('beforeend', content);
+	td.style.padding = "2px 5px 2px 5px";
+	return td;
+}
+
 function createPopup(){
     var div = document.createElement('div');
     div.setAttribute('class', "modal fade tldr-helper");
@@ -89,7 +138,7 @@ function createPopup(){
                                 </div>
                             </div>
                             <div class="modal-body">
-                                <div class="interstitial">
+                                <div class="interstitial" id="`+POPUP_ID+`">
                                     <div class="buttons">
                                         <a href="/" class="c-btn c-btn-primary">Got It</a>
                                     </div>
@@ -102,9 +151,11 @@ function createPopup(){
     document.getElementById('tldr-close').addEventListener("click", function (){
         hidePopup();
     }, false);
+    updatePopup();
+    /* Adds a button in the sidebar that calls the popup precedently created*/
     var side = document.getElementsByClassName('side');
     if (side.length > 0) {
-        var div = `
+        var spacer = `
         <div class="spacer">
             <div class="sidebox">
                 <div class="morelink">
@@ -113,11 +164,48 @@ function createPopup(){
                 </div>
             </div>
         </div>`;
-        side[0].children[1].insertAdjacentHTML('afterend', div);
+        side[0].children[1].insertAdjacentHTML('afterend', spacer);
         document.getElementById('open-tldr').addEventListener("click", function () {
             displayPopup();
         }, false);
     }
+}
+
+/** Inserts saved links into the popup*/
+function updatePopup(){
+	var tldrs = sortTldrs(tldrs);
+	var subreddits = [];
+	for (var i = 0; i < tldrs.length; i++) {
+		if (!subreddits.includes(tldrs[i]['subreddit'])) {
+			subreddits.push(tldrs[i]['subreddit']);
+		}
+	}
+	var div = document.getElementById(POPUP_ID);
+	div.innerHTML = '';
+	var table = document.createElement('table');
+	table.style.fontSize = 'medium';
+	table.style.height = "500px";
+	table.style.overflowY = "scroll";
+	table.style.display = "block";
+	table.style.border = "1px solid gray";
+	for (var i = 0; i < subreddits.length; i++) {
+		var tr = table.insertRow();
+		insertCell(tr, '<div class="arrow up" role="button"></div><div class="arrow down" role="button"></div>');
+		insertCell(tr, '<a href="https://reddit.com/'+subreddits[i]+'">'+subreddits[i]+'</a>');
+		var td = insertCell(tr, '');
+		var innerTable = document.createElement('table');
+		for (var j = 0; j < tldrs.length; j++) {
+			if (tldrs[j]['subreddit'] == subreddits[i]){
+				var innerTr = innerTable.insertRow();
+				var title = insertCell(innerTr, '<a href="'+tldrs[j]['link']+'">'+tldrs[j]['title']+'</a>');
+				title.style.minWidth = "320px";
+				insertCell(innerTr, '<a href="'+tldrs[j]['comments']+'">Comments</a>');
+				insertCell(innerTr, 'Remove');
+			}
+		}
+		td.appendChild(innerTable);
+	}
+	div.appendChild(table);
 }
 
 function displayPopup(){
@@ -133,6 +221,7 @@ function hidePopup(){
     popup.setAttribute('style', "display: none");
     popup.setAttribute('aria-hidden', true);   
 }
+
 
 window.addEventListener('load', function() {
     'use strict';
