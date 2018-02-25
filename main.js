@@ -163,7 +163,7 @@ function createPopup(){
         hidePopup();
     }, false);
     updatePopup();
-    /* Adds a button in the sidebar that calls the popup precedently created*/
+    /* Adds a button in the sidebar that calls the popup previously created*/
     var side = document.getElementsByClassName('side');
     if (side.length > 0) {
         var spacer = `
@@ -182,8 +182,7 @@ function createPopup(){
     }
 }
 
-var index;
-/** Inserts saved links into the popup*/
+/** Inserts saved links into the popup. The links are grouped by subreddit */
 function updatePopup(){
 	var stored = sortTldrs();
 	var subreddits = [];
@@ -200,33 +199,52 @@ function updatePopup(){
 	table.style.overflowY = "scroll";
 	table.style.display = "block";
 	table.style.borderBottom = "1px solid gray";
+	div.appendChild(table);
 	for (var i = 0; i < subreddits.length; i++) {
 		var tr = table.insertRow();
-		insertCell(tr, '<div class="arrow up" role="button"></div><div class="arrow down" role="button"></div>');
+		var arrows = insertCell(tr, '<div class="arrow up" role="button" type="up"></div><div class="arrow down" role="button" type="down"></div>');
+		arrows.setAttribute('value', i);
+		var arrowUp = arrows.children[0];
+		var arrowDown = arrows.children[1];
+		if (i != 0) {
+			arrowUp.addEventListener("click", function () {
+				var i = parseInt(this.parentNode.getAttribute('value'));
+				updatePriority(subreddits[i], subreddits[i-1]);
+				updatePopup();
+			}, false);
+		} else {
+			arrowUp.style.display = 'none';
+		}
+		if (i != subreddits.length-1){
+			arrowDown.addEventListener("click", function () {
+				var i = parseInt(this.parentNode.getAttribute('value'));
+				updatePriority(subreddits[i+1], subreddits[i]);
+				updatePopup();
+			}, false);
+		} else {
+			arrowDown.style.display = "none";
+		}
 		insertCell(tr, '<a href="https://reddit.com/'+subreddits[i]+'">'+subreddits[i]+'</a>');
 		tr.style.borderTop = "1px solid gray";
 		var td = insertCell(tr, '');
 		var innerTable = document.createElement('table');
+		td.appendChild(innerTable);
 		for (var j = 0; j < stored.length; j++) {
 			if (stored[j]['subreddit'] == subreddits[i]){
 				var innerTr = innerTable.insertRow();
 				var title = insertCell(innerTr, '<a href="'+stored[j]['link']+'">'+stored[j]['title']+'</a>');
 				title.style.minWidth = "320px";
 				insertCell(innerTr, '<a href="'+stored[j]['comments']+'">Comments</a>');
-				insertCell(innerTr, '<a href="javascript: return false;" id="remove-tldr-'+stored[j]['id']+'" value="'+j+'">Remove</a>');
+				var removeBtn = insertCell(innerTr, '<a href="javascript: return false;">Remove</a>');
+				removeBtn.setAttribute('value', j);
+				removeBtn.addEventListener("click", function() {
+					var k = parseInt(this.getAttribute('value'));
+					console.log(stored, this);
+					updateLink(stored[k]);
+					updatePopup();
+				}, false);	
 			}
 		}
-		td.appendChild(innerTable);
-	}
-	div.appendChild(table);
-	for (var i = 0; i < stored.length; i++) {
-		document.getElementById("remove-tldr-" + stored[i]['id']).addEventListener("click", function() {
-			i = parseInt(this.getAttribute('value'));
-			console.log(stored);
-			console.log(stored[i]);
-			updateLink(stored[i]);
-			updatePopup();
-		}, false);	
 	}
 	/* Adds a button at the bottom of the div to remove all saved tldrs*/
 	var clearButton = `            
