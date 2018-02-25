@@ -73,17 +73,56 @@ function sortTldrs(){
 	return sorted;
 }
 
+/* Inserts a button that allows to store this subreddit */
+function insertSubredditButton(subreddit){
+	var side = document.getElementsByClassName('side');
+	var savedSubs = new Set(JSON.parse(GM_getValue(SAVED_SUBREDDITS, '[]')));
+	if (side.length > 0){
+		if (savedSubs.has(subreddit)) {
+			var text = "Remove subreddit";
+		} else {
+			var text = "Save subreddit";
+		}
+		var newButton = `
+	        <div class="spacer">
+	            <div class="sidebox submit submit-link" style="display:block">
+	                <div class="morelink">
+	                    <a href="#" target="_top" id="tldr-sotd" value="`+ subreddit +`">`+ text +`</a>
+	                    <div class="nub"></div>
+	                </div>
+	            </div>
+	        </div>`;
+		side[0].children[1].insertAdjacentHTML('afterend', newButton);
+	}
+	document.getElementById('tldr-sotd').addEventListener("click", function () {
+		var savedSubs = new Set(JSON.parse(GM_getValue(SAVED_SUBREDDITS, '[]')));
+		var subreddit = this.getAttribute('value');
+		if (savedSubs.has(subreddit)) {
+			savedSubs.delete(subreddit);
+			this.innerHTML = "Save subreddit";
+		} else {
+			savedSubs.add(subreddit);
+			this.innerHTML = "Remove subreddit";
+		}
+		GM_setValue(SAVED_SUBREDDITS, JSON.stringify(Array.from(savedSubs)));
+	}, false);
+}
+
 /** Inserts 'save tldr' / 'remove tldr' buttons near to each reddit link found in the page*/
 function appendButtons(){
     var links = document.getElementsByClassName('link');
     var tldrs = {};
+	var match = /r\/\w+/g.exec(window.location);
+	if (match) {
+		insertSubredditButton(match[0]);
+	}    
     for (var i = 0; i < links.length; i++){
         var id = /t3_(\w+)/g.exec(links[i].id)[1];
         var elems = links[i].getElementsByTagName('a');
         if (elems.length < 6) {
             continue;  // Reddit ad, not to be considered
         }
-        var match = /r\/\w+/g.exec(window.location);
+        
         if (match) {
         	// we are in a subreddit page.
         	var subreddit = match[0];
@@ -96,7 +135,6 @@ function appendButtons(){
 	            'subreddit': subreddit,
 	            'comments': elems[4].getAttribute('href')
         	};
-        	// todo insert button to save subreddit of the day here
         } else {
         	// we are in the mainpage
             var subreddit = elems[4].innerHTML;
@@ -168,7 +206,7 @@ function createPopup(){
     if (side.length > 0) {
         var spacer = `
         <div class="spacer">
-            <div class="sidebox submit submit-link">
+            <div class="sidebox submit submit-link" style="display:block">
                 <div class="morelink">
                     <a href="#" target="_top" id="open-tldr">Manage TLDR</a>
                     <div class="nub"></div>
@@ -229,9 +267,13 @@ function updatePopup(){
 		var td = insertCell(tr, '');
 		var innerTable = document.createElement('table');
 		td.appendChild(innerTable);
+		var first = true;
 		for (var j = 0; j < stored.length; j++) {
 			if (stored[j]['subreddit'] == subreddits[i]){
 				var innerTr = innerTable.insertRow();
+				if (!first) {
+					innerTr.style.borderTop = "1px solid gray";
+				}
 				var title = insertCell(innerTr, '<a href="'+stored[j]['link']+'">'+stored[j]['title']+'</a>');
 				title.style.minWidth = "320px";
 				insertCell(innerTr, '<a href="'+stored[j]['comments']+'">Comments</a>');
@@ -242,14 +284,18 @@ function updatePopup(){
 					console.log(stored, this);
 					updateLink(stored[k]);
 					updatePopup();
-				}, false);	
+				}, false);
+				first = false;	
 			}
 		}
 	}
 	/* Adds a button at the bottom of the div to remove all saved tldrs*/
-	var clearButton = `            
-		<div class="buttons">
-            <a href="javascript: return false;" class="c-btn c-btn-primary" id="`+CLEAR_BUTTON_ID+`">CLEAR ALL</a>
+	var clearButton = `
+		<div id="popup-bottom">            
+			<div class="buttons">
+	            <a href="javascript: return false;" class="c-btn c-btn-primary" id="`+CLEAR_BUTTON_ID+`">CLEAR ALL</a>
+	        </div>
+	        <label>Subreddit of the day</label>
         </div>`;
 	div.insertAdjacentHTML('beforeend', clearButton);
 	var clearButton = document.getElementById(CLEAR_BUTTON_ID);
@@ -257,6 +303,16 @@ function updatePopup(){
 		GM_setValue(SAVED_TLDRS, '{}');
 		window.location.reload();
 	}, false);
+	/* Adds a selector for the subreddit of the day */
+	var bottom = document.getElementById('popup-bottom');
+	var select = document.createElement('select');
+	select.id = 'select-sotd';
+	bottom.appendChild(select);
+	var savedSubs = JSON.parse(GM_getValue(SAVED_SUBREDDITS, '[]'));
+	for (var i = 0; i < savedSubs.length; i++) {
+		var option = new Option(savedSubs[i], savedSubs[i]);
+		select.appendChild(option);
+	}
 }
 
 function displayPopup(){
