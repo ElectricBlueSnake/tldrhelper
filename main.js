@@ -17,6 +17,7 @@ const POPUP_ID = 'tldr-popup';
 const SAVED_TLDRS = 'savedTldrs';
 const SAVED_SUBREDDITS = 'savedSubs';
 const PRIORITIES = 'priorities';  // stores the order in which subreddits should be displayed
+const SOTD = 'subredditOfTheDay';
 
 function updateLink(tldr){
     var tldrs = JSON.parse(GM_getValue(SAVED_TLDRS, '{}'));
@@ -79,15 +80,15 @@ function insertSubredditButton(subreddit){
 	var savedSubs = new Set(JSON.parse(GM_getValue(SAVED_SUBREDDITS, '[]')));
 	if (side.length > 0){
 		if (savedSubs.has(subreddit)) {
-			var text = "Remove subreddit";
+			var text = "Remove sub";
 		} else {
-			var text = "Save subreddit";
+			var text = "Save sub";
 		}
 		var newButton = `
 	        <div class="spacer">
-	            <div class="sidebox submit submit-link" style="display:block">
+	            <div class="sidebox submit" style="display:block">
 	                <div class="morelink">
-	                    <a href="#" target="_top" id="tldr-sotd" value="`+ subreddit +`">`+ text +`</a>
+	                    <a href="javascript: return false" target="_top" id="tldr-sotd" value="`+ subreddit +`">`+ text +`</a>
 	                    <div class="nub"></div>
 	                </div>
 	            </div>
@@ -99,10 +100,10 @@ function insertSubredditButton(subreddit){
 		var subreddit = this.getAttribute('value');
 		if (savedSubs.has(subreddit)) {
 			savedSubs.delete(subreddit);
-			this.innerHTML = "Save subreddit";
+			this.innerHTML = "Save sub";
 		} else {
 			savedSubs.add(subreddit);
-			this.innerHTML = "Remove subreddit";
+			this.innerHTML = "Remove sub";
 		}
 		GM_setValue(SAVED_SUBREDDITS, JSON.stringify(Array.from(savedSubs)));
 	}, false);
@@ -110,7 +111,7 @@ function insertSubredditButton(subreddit){
 
 /** Inserts 'save tldr' / 'remove tldr' buttons near to each reddit link found in the page*/
 function appendButtons(){
-    var links = document.getElementsByClassName('link');
+    var links = document.getElementsByClassName('link thing');
     var tldrs = {};
 	var match = /r\/\w+/g.exec(window.location);
 	if (match) {
@@ -118,37 +119,31 @@ function appendButtons(){
 	}    
     for (var i = 0; i < links.length; i++){
         var id = /t3_(\w+)/g.exec(links[i].id)[1];
-        var elems = links[i].getElementsByTagName('a');
+        var div = links[i].getElementsByClassName('top-matter')[0];
+        var elems = div.getElementsByTagName('a');
         if (elems.length < 6) {
             continue;  // Reddit ad, not to be considered
         }
-        
         if (match) {
         	// we are in a subreddit page.
         	var subreddit = match[0];
-        	addPriority(subreddit);
-        	var tldr = {
-	            'id': id,
-	            'title': elems[1].innerHTML,
-	            'link': elems[1].getAttribute('href'),
-	            'author': elems[3].innerHTML,
-	            'subreddit': subreddit,
-	            'comments': elems[4].getAttribute('href')
-        	};
+        	var comments = elems[3].getAttribute('href');
         } else {
         	// we are in the mainpage
-            var subreddit = elems[4].innerHTML;
-	        addPriority(subreddit);
-	        var tldr = {
-	            'id': id,
-	            'title': elems[1].innerHTML,
-	            'link': elems[1].getAttribute('href'),
-	            'author': elems[3].innerHTML,
-	            'subreddit': subreddit,
-	            'comments': elems[5].getAttribute('href')
-	        };    	
+            var subreddit = elems[3].innerHTML;
+	        var comments = elems[4].getAttribute('href');   	
         }
+        var tldr = {
+            'id': id,
+            'title': elems[0].innerHTML,
+            'link': elems[0].getAttribute('href'),
+            'author': elems[2].innerHTML,
+            'subreddit': subreddit,
+            'comments': comments
+    	};
+        addPriority(subreddit);
         tldrs[id] = tldr;
+        /* Inserts "save tldr" link in the ul flat list */
         var uls = links[i].getElementsByTagName('ul');
         var ul = uls[uls.length-1];
         var li = document.createElement('li');
@@ -206,7 +201,7 @@ function createPopup(){
     if (side.length > 0) {
         var spacer = `
         <div class="spacer">
-            <div class="sidebox submit submit-link" style="display:block">
+            <div class="sidebox submit" style="display:block">
                 <div class="morelink">
                     <a href="#" target="_top" id="open-tldr">Manage TLDR</a>
                     <div class="nub"></div>
@@ -330,9 +325,46 @@ function hidePopup(){
     popup.setAttribute('aria-hidden', true);   
 }
 
+/** Returns the formatted post from the saved links */
+function formatPost(){
+	var output = "";
+	var stored = sortTldrs();
+	var subreddits = [];
+	for (var i = 0; i < stored.length; i++) {
+		if (!subreddits.includes(stored[i]['subreddit'])) {
+			subreddits.push(stored[i]['subreddit']);
+		}
+	}
+	for (var i = 0; i < subreddits.length; i++) {
+		output += "#[/" + subreddits[i] + "](https://reddit.com/"+subreddits[i]+")\n\n";
+		for (var j = 0; j < stored.length; j++) {
+			if (stored[j]['subreddit'] == subreddits[i]){
+				output += "- [**/u/" + stored[j]['author'] + "**](https://reddit.com/u/" + stored[j]['author'] + ")\n\n " +
+							"**" + stored[j]['title'] + "**\n\n " +
+							"[**Comments**](" + stored[j]['comments'] + ") || [**Link**](" + stored[j]['link'] + ")\n\n";
+			}
+		}
+		output += "&nbsp;\n\n---\n---\n";
+	}
+	var sotd = GM_getValue(SOTD, '');
+	output += "#Something New\n\nEveryday we’ll feature a selected small subreddit and its top content. It's a fun way to include and celebrate smaller subreddits.\n\n" +
+				"#Today's subreddit is...\n\n#[/"+sotd+"](https://reddit.com/"+sotd+")\n\nIts top 3 all time posts\n\n";
+	// TODO http request to reddit API to retrieve top 3 posts
+	output += "&nbsp;\n\n---\n---\n---";
+	return output;	
+}
+
+function fillForm(){
+	var match = /r\/tldr/g.exec(window.location.href);
+	if (match) {
+		var textAreas = document.getElementsByTagName('textarea');
+		textAreas[1].value = formatPost();
+	}
+}
 
 window.addEventListener('load', function() {
     'use strict';
     appendButtons();
     createPopup();
+    fillForm();
 }, false);
