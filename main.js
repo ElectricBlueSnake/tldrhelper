@@ -339,44 +339,56 @@ function hidePopup(){
 
 /** Returns the formatted post from the saved links */
 function formatPost(){
-	var output = "";
-	var stored = sortTldrs();
-	var subreddits = [];
-	for (var i = 0; i < stored.length; i++) {
-		if (!subreddits.includes(stored[i]['subreddit'])) {
-			subreddits.push(stored[i]['subreddit']);
-		}
-	}
-	for (var i = 0; i < subreddits.length; i++) {
-		output += "#[/" + subreddits[i] + "](https://reddit.com/"+subreddits[i]+")\n\n";
-		for (var j = 0; j < stored.length; j++) {
-			if (stored[j]['subreddit'] == subreddits[i]){
-				output += "- [**/u/" + stored[j]['author'] + "**](https://reddit.com/u/" + stored[j]['author'] + ")\n\n " +
-							"**" + stored[j]['title'] + "**\n\n " +
-							"[**Comments**](" + stored[j]['comments'] + ") || [**Link**](" + stored[j]['link'] + ")\n\n";
-			}
-		}
-		output += "&nbsp;\n\n---\n---\n";
-	}
-	var sotd = GM_getValue(SOTD, '');
-	output += "#Something New\n\nEveryday we’ll feature a selected small subreddit and its top content. It's a fun way to include and celebrate smaller subreddits.\n\n" +
-				"#Today's subreddit is...\n\n#[/"+sotd+"](https://reddit.com/"+sotd+")\n\nIts top 3 all time posts\n\n";
 	// TODO http request to reddit API to retrieve top 3 posts
-	output += "&nbsp;\n\n---\n---\n---";
-	return output;	
-}
-
-function fillForm(){
-	var match = /r\/tldr/g.exec(window.location.href);
-	if (match) {
-		var textAreas = document.getElementsByTagName('textarea');
-		textAreas[1].value = formatPost();
-	}
+	var http = new XMLHttpRequest();
+	var sotd = GM_getValue(SOTD, '');
+	var url = "https://www.reddit.com/" + sotd + "/top.json";
+	var params = JSON.stringify({ 'limit': 3 });
+	http.onreadystatechange = function() { 
+        if (http.readyState == 4 && http.status == 200){
+			var output = "";
+			var stored = sortTldrs();
+			var subreddits = [];
+			for (var i = 0; i < stored.length; i++) {
+				if (!subreddits.includes(stored[i]['subreddit'])) {
+					subreddits.push(stored[i]['subreddit']);
+				}
+			}
+			for (var i = 0; i < subreddits.length; i++) {
+				output += "#[/" + subreddits[i] + "](https://reddit.com/"+subreddits[i]+")\n\n";
+				for (var j = 0; j < stored.length; j++) {
+					if (stored[j]['subreddit'] == subreddits[i]){
+						output += "- [**/u/" + stored[j]['author'] + "**](https://reddit.com/u/" + stored[j]['author'] + ")\n\n " +
+									"**" + stored[j]['title'] + "**\n\n " +
+									"[**Comments**](" + stored[j]['comments'] + ") || [**Link**](" + stored[j]['link'] + ")\n\n";
+					}
+				}
+				output += "&nbsp;\n\n---\n---\n";
+			}
+			output += "#Something New\n\nEveryday we’ll feature a selected small subreddit and its top content. It's a fun way to include and celebrate smaller subreddits.\n\n" +
+						"#Today's subreddit is...\n\n#[/"+sotd+"](https://reddit.com/"+sotd+")\n\nIts top 3 all time posts\n\n";
+        	var response = JSON.parse(http.responseText)['data'];
+        	console.log(response['children'][0]);
+            for (var i = 0; i < 3; i++) {
+				output += "- [**/u/" + response['children'][i]['data']['author'] + "**](https://reddit.com/u/" + response['children'][i]['data']['author'] + ")\n\n " +
+							"**" + response['children'][i]['data']['title'] + "**\n\n " +
+							"[**Comments**](" + response['children'][i]['data']['permalink'] + ") || [**Link**](" + response['children'][i]['data']['url'] + ")\n\n";            	
+            }
+            output += "&nbsp;\n\n---\n---\n---";
+			var textAreas = document.getElementsByTagName('textarea');
+			textAreas[1].value = output;	
+        }
+    }
+   	http.open("GET", url, true);
+	http.send(params);
 }
 
 window.addEventListener('load', function() {
     'use strict';
     appendButtons();
     createPopup();
-    fillForm();
+	var match = /r\/tldr/g.exec(window.location.href);
+	if (match) {
+		formatPost();
+	}
 }, false);
