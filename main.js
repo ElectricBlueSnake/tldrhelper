@@ -116,18 +116,22 @@ function appendButtons(){
 	var match = /r\/\w+/g.exec(window.location);
 	if (match) {
 		insertSubredditButton(match[0]);
-	}    
+	}
     for (var i = 0; i < links.length; i++){
         var id = /t3_(\w+)/g.exec(links[i].id)[1];
         var div = links[i].getElementsByClassName('top-matter')[0];
         var elems = div.getElementsByTagName('a');
-        if (elems.length < 6) {
+        if (div.getElementsByClassName('recommended-stamp').length > 0) {
             continue;  // Reddit ad, not to be considered
         }
         if (match) {
         	// we are in a subreddit page.
         	var subreddit = match[0];
-        	var comments = elems[3].getAttribute('href');
+        	if (elems.length < 4) {
+        		var comments = document.location.href;
+        	} else {
+        		var comments = elems[3].getAttribute('href');        		
+        	}
         } else {
         	// we are in the mainpage
             var subreddit = elems[3].innerHTML;
@@ -303,11 +307,19 @@ function updatePopup(){
 	var select = document.createElement('select');
 	select.id = 'select-sotd';
 	bottom.appendChild(select);
+	var chosen = GM_getValue(SOTD);
 	var savedSubs = JSON.parse(GM_getValue(SAVED_SUBREDDITS, '[]'));
 	for (var i = 0; i < savedSubs.length; i++) {
 		var option = new Option(savedSubs[i], savedSubs[i]);
 		select.appendChild(option);
 	}
+	if (chosen) {
+		select.value = chosen;
+	}
+	select.addEventListener("change", function () {
+		console.log("Changed subreddit of the day to", this.value);
+		GM_setValue(SOTD, this.value);
+	}, false);
 }
 
 function displayPopup(){
