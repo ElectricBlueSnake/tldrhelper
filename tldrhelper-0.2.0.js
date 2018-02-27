@@ -37,8 +37,8 @@ function updateLink(tldr){
         GM_setValue(SAVED_TLDRS, JSON.stringify(tldrs)); 
         var button = document.getElementById(id);
         if (button) {
-        button.innerHTML = REMOVE_BUTTON;
-        button.setAttribute("saved", true);        	
+	        button.innerHTML = REMOVE_BUTTON;
+    	    button.setAttribute("saved", true);        	
         }
     }
 }
@@ -162,7 +162,7 @@ function appendButtons(){
         			'subreddit': "r/" + submission['subreddit']
         		};
         		updateLink(tldr);
-            	addPriority(submission['subreddit']);
+            	addPriority(tldr['subreddit']);
         	});
         }, false);
         var saved = GM_getValue(SAVED_TLDRS, "{}");
@@ -327,7 +327,6 @@ function updatePopup(){
 		select.value = chosen;
 	}
 	select.addEventListener("change", function () {
-		console.log("Changed subreddit of the day to", this.value);
 		GM_setValue(SOTD, this.value);
 	}, false);
 }
@@ -371,8 +370,8 @@ function formatPost(){
 					output += "- **/u/" + stored[j]['author'] + "**\n\n " +
 								"**" + stored[j]['title'] + "**\n\n ";
 					/* Saves some characters by not inserting the "link" section when there is no external link (self post) */
-					if (stored[j]['comments'] == stored[j]['link']) {
-						output += "[**Comments**](" + stored[j]['comments'] + ")";
+					if (stored[j]['link'].includes(stored[j]['comments'])) {
+						output += "[**Comments**](" + stored[j]['comments'] + ")\n\n";
 					} else {
 						output += "[**Comments**](" + stored[j]['comments'] + ") || [**Link**](" + stored[j]['link'] + ")\n\n";
 					}
