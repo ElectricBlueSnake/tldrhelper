@@ -29,12 +29,17 @@ function updateLink(tldr){
         var button = document.getElementById(id);
         if (button) {
         	button.innerHTML = SAVE_BUTTON;
+        	button.setAttribute("saved", false);
         }
     } else {
         // need to add the element
         tldrs[id] = tldr;
         GM_setValue(SAVED_TLDRS, JSON.stringify(tldrs)); 
-        document.getElementById(id).innerHTML = REMOVE_BUTTON;
+        var button = document.getElementById(id);
+        if (button) {
+        button.innerHTML = REMOVE_BUTTON;
+        button.setAttribute("saved", true);        	
+        }
     }
 }
 
@@ -59,7 +64,7 @@ function updatePriority(s1, s2){
 	GM_setValue(PRIORITIES, JSON.stringify(priorities));
 }
 
-/** Returns a list with the saved submissiosn in subreddit priority order */
+/** Returns a list with the saved submissions in subreddit priority order */
 function sortTldrs(){
 	var tldrs = JSON.parse(GM_getValue(SAVED_TLDRS, '{}'));
 	var priorities = JSON.parse(GM_getValue(PRIORITIES, '[]'));
@@ -96,10 +101,20 @@ function insertSubredditButton(subreddit){
 		side[0].children[1].insertAdjacentHTML('afterend', newButton);
 	}
 	document.getElementById('tldr-sotd').addEventListener("click", function () {
-		var savedSubs = new Set(JSON.parse(GM_getValue(SAVED_SUBREDDITS, '[]')));
+		var sotd = GM_getValue(SOTD, null);
+		var arr = JSON.parse(GM_getValue(SAVED_SUBREDDITS, '[]'))
+		var savedSubs = new Set(arr);
 		var subreddit = this.getAttribute('value');
+		if (!sotd) {
+			GM_setValue(SOTD, subreddit);
+		}
 		if (savedSubs.has(subreddit)) {
 			savedSubs.delete(subreddit);
+			if (arr.length > 0) {
+				GM_setValue(SOTD, arr[0]);
+			} else {
+				GM_setValue(SOTD, null);
+			}
 			this.innerHTML = "Save sub";
 		} else {
 			savedSubs.add(subreddit);
@@ -112,53 +127,46 @@ function insertSubredditButton(subreddit){
 /** Inserts 'save tldr' / 'remove tldr' buttons near to each reddit link found in the page*/
 function appendButtons(){
     var links = document.getElementsByClassName('link thing');
-    var tldrs = {};
 	var match = /r\/\w+/g.exec(window.location);
 	if (match) {
 		insertSubredditButton(match[0]);
 	}
     for (var i = 0; i < links.length; i++){
-        var id = /t3_(\w+)/g.exec(links[i].id)[1];
+        var id = /t3_\w+/g.exec(links[i].id)[0];
         var div = links[i].getElementsByClassName('top-matter')[0];
-        var elems = div.getElementsByTagName('a');
         if (div.getElementsByClassName('recommended-stamp').length > 0) {
             continue;  // Reddit ad, not to be considered
         }
-        if (match) {
-        	// we are in a subreddit page.
-        	var subreddit = match[0];
-        	if (elems.length < 4) {
-        		var comments = document.location.href;
-        	} else {
-        		var comments = elems[3].getAttribute('href');        		
-        	}
-        } else {
-        	// we are in the mainpage
-            var subreddit = elems[3].innerHTML;
-	        var comments = elems[4].getAttribute('href');   	
-        }
-        var tldr = {
-            'id': id,
-            'title': elems[0].innerHTML,
-            'link': elems[0].getAttribute('href'),
-            'author': elems[2].innerHTML,
-            'subreddit': subreddit,
-            'comments': comments
-    	};
-        addPriority(subreddit);
-        tldrs[id] = tldr;
         /* Inserts "save tldr" link in the ul flat list */
         var uls = links[i].getElementsByTagName('ul');
         var ul = uls[uls.length-1];
         var li = document.createElement('li');
         var a = document.createElement('a');
         a.setAttribute('href', 'javascript: void(0)');
-        a.addEventListener("click", function(){
-            updateLink(tldrs[this.id]);
-        }, false);
         a.setAttribute('id', id);
+        a.addEventListener("click", function(){
+        	if (this.getAttribute("saved") == 'true') {
+        		updateLink({'id': this.id});
+        		return;
+        	}
+        	var url = "https://www.reddit.com/api/info.json?id=" + this.id;
+        	httpCall(url, {}, function(response){
+        		var submission = JSON.parse(response)['data']['children'][0]['data'];
+        		var tldr = {
+        			'id': submission['name'],
+        			'title': submission['title'],
+        			'comments': submission['permalink'],
+        			'link': submission['url'],
+        			'author': submission['author'],
+        			'subreddit': "r/" + submission['subreddit']
+        		};
+        		updateLink(tldr);
+            	addPriority(submission['subreddit']);
+        	});
+        }, false);
         var saved = GM_getValue(SAVED_TLDRS, "{}");
         var isSaved = id in JSON.parse(saved);
+        a.setAttribute("saved", isSaved);
         if (isSaved){
             a.appendChild(document.createTextNode(REMOVE_BUTTON));
         } else {
@@ -280,7 +288,6 @@ function updatePopup(){
 				removeBtn.setAttribute('value', j);
 				removeBtn.addEventListener("click", function() {
 					var k = parseInt(this.getAttribute('value'));
-					console.log(stored, this);
 					updateLink(stored[k]);
 					updatePopup();
 				}, false);
@@ -339,56 +346,58 @@ function hidePopup(){
 
 /** Returns the formatted post from the saved links */
 function formatPost(){
-	// TODO http request to reddit API to retrieve top 3 posts
-	var http = new XMLHttpRequest();
+	var match = /r\/tldr/g.exec(window.location.href);
+	if (!match) {
+		return;
+	}
 	var sotd = GM_getValue(SOTD, '');
 	var url = "https://www.reddit.com/" + sotd + "/top.json";
 	var params = JSON.stringify({ 'limit': 3 });
+	httpCall(url, params, function (response) {
+		var output = "";
+		var stored = sortTldrs();
+		var subreddits = [];
+		for (var i = 0; i < stored.length; i++) {
+			if (!subreddits.includes(stored[i]['subreddit'])) {
+				subreddits.push(stored[i]['subreddit']);
+			}
+		}
+		for (var i = 0; i < subreddits.length; i++) {
+			output += "#/" + subreddits[i] + "\n\n";
+			for (var j = 0; j < stored.length; j++) {
+				if (stored[j]['subreddit'] == subreddits[i]){
+					output += "- **/u/" + stored[j]['author'] + "**\n\n " +
+								"**" + stored[j]['title'] + "**\n\n " +
+								"[**Comments**](" + stored[j]['comments'] + ") || [**Link**](" + stored[j]['link'] + ")\n\n";
+				}
+			}
+			output += "&nbsp;\n\n---\n---\n";
+		}
+		output += "#Something New\n\nEveryday we’ll feature a selected small subreddit and its top content. It's a fun way to include and celebrate smaller subreddits.\n\n" +
+					"#Today's subreddit is...\n\n#/"+sotd+"\n\nIts top 3 all time posts\n\n";
+    	var response = JSON.parse(response)['data'];
+        for (var i = 0; i < 3; i++) {
+			output += "- **/u/" + response['children'][i]['data']['author'] + "**\n\n " +
+						"**" + response['children'][i]['data']['title'] + "**\n\n " +
+						"[**Comments**](" + response['children'][i]['data']['permalink'] + ") || [**Link**](" + response['children'][i]['data']['url'] + ")\n\n";            	
+        }
+        output += "&nbsp;\n\n---\n---\n---";
+		var textAreas = document.getElementsByTagName('textarea');
+		textAreas[1].value = output;
+	});	
+}
+
+function httpCall(url, params, callback){
+	var http = new XMLHttpRequest();
 	http.onreadystatechange = function() { 
         if (http.readyState == 4 && http.status == 200){
-			var output = "";
-			var stored = sortTldrs();
-			var subreddits = [];
-			for (var i = 0; i < stored.length; i++) {
-				if (!subreddits.includes(stored[i]['subreddit'])) {
-					subreddits.push(stored[i]['subreddit']);
-				}
-			}
-			for (var i = 0; i < subreddits.length; i++) {
-				output += "#[/" + subreddits[i] + "](https://reddit.com/"+subreddits[i]+")\n\n";
-				for (var j = 0; j < stored.length; j++) {
-					if (stored[j]['subreddit'] == subreddits[i]){
-						output += "- [**/u/" + stored[j]['author'] + "**](https://reddit.com/u/" + stored[j]['author'] + ")\n\n " +
-									"**" + stored[j]['title'] + "**\n\n " +
-									"[**Comments**](" + stored[j]['comments'] + ") || [**Link**](" + stored[j]['link'] + ")\n\n";
-					}
-				}
-				output += "&nbsp;\n\n---\n---\n";
-			}
-			output += "#Something New\n\nEveryday we’ll feature a selected small subreddit and its top content. It's a fun way to include and celebrate smaller subreddits.\n\n" +
-						"#Today's subreddit is...\n\n#[/"+sotd+"](https://reddit.com/"+sotd+")\n\nIts top 3 all time posts\n\n";
-        	var response = JSON.parse(http.responseText)['data'];
-        	console.log(response['children'][0]);
-            for (var i = 0; i < 3; i++) {
-				output += "- [**/u/" + response['children'][i]['data']['author'] + "**](https://reddit.com/u/" + response['children'][i]['data']['author'] + ")\n\n " +
-							"**" + response['children'][i]['data']['title'] + "**\n\n " +
-							"[**Comments**](" + response['children'][i]['data']['permalink'] + ") || [**Link**](" + response['children'][i]['data']['url'] + ")\n\n";            	
-            }
-            output += "&nbsp;\n\n---\n---\n---";
-			var textAreas = document.getElementsByTagName('textarea');
-			textAreas[1].value = output;	
+			callback(http.responseText);	
         }
-    }
+    };
    	http.open("GET", url, true);
 	http.send(params);
 }
 
-window.addEventListener('load', function() {
-    'use strict';
-    appendButtons();
-    createPopup();
-	var match = /r\/tldr/g.exec(window.location.href);
-	if (match) {
-		formatPost();
-	}
-}, false);
+appendButtons();
+createPopup();
+formatPost();
