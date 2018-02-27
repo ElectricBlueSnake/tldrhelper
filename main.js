@@ -144,11 +144,13 @@ function appendButtons(){
         var a = document.createElement('a');
         a.setAttribute('href', 'javascript: void(0)');
         a.setAttribute('id', id);
+        /* A listener is added to the button such that it saves or unsaves the post */
         a.addEventListener("click", function(){
         	if (this.getAttribute("saved") == 'true') {
         		updateLink({'id': this.id});
         		return;
         	}
+        	this.innerHTML = "saving...";
         	var url = "https://www.reddit.com/api/info.json?id=" + this.id;
         	httpCall(url, {}, function(response){
         		var submission = JSON.parse(response)['data']['children'][0]['data'];
@@ -177,6 +179,7 @@ function appendButtons(){
     }    
 }
 
+/** Inserts a cell into the given row, filling it with the HTML content (given as a string) */
 function insertCell(tr, content){
 	var td = tr.insertCell();
 	td.insertAdjacentHTML('beforeend', content);
@@ -189,7 +192,7 @@ function createPopup(){
     div.setAttribute('class', "modal fade tldr-helper");
     div.setAttribute('style', "display: none");
     div.setAttribute('aria-hidden', true);
-    var content = `<div class="modal-dialog modal-dialog-lg">
+    var content = `<div class="modal-dialog modal-dialog-lg" style="width: 1000px">
                         <div class="modal-content">
                             <div class="modal-header">
                                 <div class="modal-header-close">
@@ -240,7 +243,7 @@ function updatePopup(){
 	div.innerHTML = '';
 	var table = document.createElement('table');
 	table.style.fontSize = 'medium';
-	table.style.height = "500px";
+	table.style.height = '' + (window.innerHeight * 0.65) + "px";
 	table.style.overflowY = "scroll";
 	table.style.display = "block";
 	table.style.borderBottom = "1px solid gray";
@@ -282,7 +285,7 @@ function updatePopup(){
 					innerTr.style.borderTop = "1px solid gray";
 				}
 				var title = insertCell(innerTr, '<a href="'+stored[j]['link']+'">'+stored[j]['title']+'</a>');
-				title.style.minWidth = "320px";
+				title.style.width = "550px";
 				insertCell(innerTr, '<a href="'+stored[j]['comments']+'">Comments</a>');
 				var removeBtn = insertCell(innerTr, '<a href="javascript: return false;">Remove</a>');
 				removeBtn.setAttribute('value', j);
@@ -297,11 +300,11 @@ function updatePopup(){
 	}
 	/* Adds a button at the bottom of the div to remove all saved tldrs*/
 	var clearButton = `
-		<div id="popup-bottom">            
+		<div id="popup-bottom" style="font-size: medium">            
 			<div class="buttons">
 	            <a href="javascript: return false;" class="c-btn c-btn-primary" id="`+CLEAR_BUTTON_ID+`">CLEAR ALL</a>
 	        </div>
-	        <label>Subreddit of the day</label>
+	        <span style="float:left">Post count: `+stored.length+`</span>
         </div>`;
 	div.insertAdjacentHTML('beforeend', clearButton);
 	var clearButton = document.getElementById(CLEAR_BUTTON_ID);
@@ -313,7 +316,9 @@ function updatePopup(){
 	var bottom = document.getElementById('popup-bottom');
 	var select = document.createElement('select');
 	select.id = 'select-sotd';
+	select.style.float = 'right';
 	bottom.appendChild(select);
+	bottom.insertAdjacentHTML('beforeend', '<label style="float:right;padding-right: 5px">Subreddit of the day:</label>');
 	var chosen = GM_getValue(SOTD);
 	var savedSubs = JSON.parse(GM_getValue(SAVED_SUBREDDITS, '[]'));
 	for (var i = 0; i < savedSubs.length; i++) {
@@ -387,6 +392,7 @@ function formatPost(){
 	});	
 }
 
+/** Performs an HTTP get request and applies the callback function to the response received */
 function httpCall(url, params, callback){
 	var http = new XMLHttpRequest();
 	http.onreadystatechange = function() { 
