@@ -350,13 +350,12 @@ function hidePopup(){
 /** Returns the formatted post from the saved links */
 function formatPost(){
 	var match = /r\/tldr/g.exec(window.location.href);
-	if (!match) {
+	if (!match || !window.location.href.includes("submit")) {
 		return;
 	}
 	var sotd = GM_getValue(SOTD, '');
 	var url = "https://www.reddit.com/" + sotd + "/top.json";
-	var params = JSON.stringify({ 'limit': 3 });
-	httpCall(url, params, function (response) {
+	httpCall(url, {}, function (response) {
 		var output = "";
 		var stored = sortTldrs();
 		var subreddits = [];
@@ -370,8 +369,13 @@ function formatPost(){
 			for (var j = 0; j < stored.length; j++) {
 				if (stored[j]['subreddit'] == subreddits[i]){
 					output += "- **/u/" + stored[j]['author'] + "**\n\n " +
-								"**" + stored[j]['title'] + "**\n\n " +
-								"[**Comments**](" + stored[j]['comments'] + ") || [**Link**](" + stored[j]['link'] + ")\n\n";
+								"**" + stored[j]['title'] + "**\n\n ";
+					/* Saves some characters by not inserting the "link" section when there is no external link (self post) */
+					if (stored[j]['comments'] == stored[j]['link']) {
+						output += "[**Comments**](" + stored[j]['comments'] + ")";
+					} else {
+						output += "[**Comments**](" + stored[j]['comments'] + ") || [**Link**](" + stored[j]['link'] + ")\n\n";
+					}
 				}
 			}
 			output += "&nbsp;\n\n---\n---\n";
