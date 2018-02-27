@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         tldrhelper
 // @namespace    Reddit
-// @version      0.1
+// @version      0.2
 // @description  A simple script to help the awesome fellas at r/tldr
 // @author       EB_Snake
 // @include      https://*.reddit.com/*
@@ -89,8 +89,7 @@ function insertSubredditButton(subreddit){
 		} else {
 			var text = "Save sub";
 		}
-		var newButton = `
-	        <div class="spacer">
+		var newButton = `<div class="spacer">
 	            <div class="sidebox submit" style="display:block">
 	                <div class="morelink">
 	                    <a href="javascript: return false" target="_top" id="tldr-sotd" value="`+ subreddit +`">`+ text +`</a>
@@ -214,8 +213,7 @@ function createPopup(){
     /* Adds a button in the sidebar that calls the popup previously created*/
     var side = document.getElementsByClassName('side');
     if (side.length > 0) {
-        var spacer = `
-        <div class="spacer">
+        var spacer = `<div class="spacer">
             <div class="sidebox submit" style="display:block">
                 <div class="morelink">
                     <a href="#" target="_top" id="open-tldr">Manage TLDR</a>
@@ -250,7 +248,8 @@ function updatePopup(){
 	div.appendChild(table);
 	for (var i = 0; i < subreddits.length; i++) {
 		var tr = table.insertRow();
-		var arrows = insertCell(tr, '<div class="arrow up" role="button" type="up"></div><div class="arrow down" role="button" type="down"></div>');
+		var arrows = insertCell(tr, 
+			'<div class="arrow up" role="button" type="up"></div><div class="arrow down" role="button" type="down"></div>');
 		arrows.setAttribute('value', i);
 		var arrowUp = arrows.children[0];
 		var arrowDown = arrows.children[1];
@@ -299,8 +298,7 @@ function updatePopup(){
 		}
 	}
 	/* Adds a button at the bottom of the div to remove all saved tldrs*/
-	var clearButton = `
-		<div id="popup-bottom" style="font-size: medium">            
+	var clearButton = `<div id="popup-bottom" style="font-size: medium">            
 			<div class="buttons">
 	            <a href="javascript: return false;" class="c-btn c-btn-primary" id="`+CLEAR_BUTTON_ID+`">CLEAR ALL</a>
 	        </div>
