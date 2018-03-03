@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         tldrhelper
 // @namespace    Reddit
-// @version      0.2
+// @version      0.2.1
 // @description  A simple script to help the awesome fellas at r/tldr
 // @author       EB_Snake
 // @include      https://*.reddit.com/*
@@ -16,6 +16,7 @@ const CLEAR_BUTTON_ID = 'clear-tldrs';
 const POPUP_ID = 'tldr-popup';
 const SAVED_TLDRS = 'savedTldrs';
 const SAVED_SUBREDDITS = 'savedSubs';
+const TITLE = 'title';
 const PRIORITIES = 'priorities';  // stores the order in which subreddits should be displayed
 const SOTD = 'subredditOfTheDay';
 
@@ -31,6 +32,9 @@ function updateLink(tldr){
         	button.innerHTML = SAVE_BUTTON;
         	button.setAttribute("saved", false);
         }
+        var title = new Set(JSON.parse(GM_getValue(TITLE, '[]')));
+        title.delete(id);
+        GM_setValue(TITLE, JSON.stringify(Array.from(title)));
     } else {
         // need to add the element
         tldrs[id] = tldr;
@@ -228,6 +232,23 @@ function createPopup(){
     }
 }
 
+function formatDate(){
+	var today = new Date();
+	var options = {weekday: 'long', month: 'long', year: 'numeric', day: 'numeric'};
+	var text = today.toLocaleDateString('en-US', options);
+	return text.slice(0, -6) + text.slice(text.length-5);
+}
+
+function formatTitle(){
+	var ids = JSON.parse(GM_getValue(TITLE, '[]'));
+	var tldrs = JSON.parse(GM_getValue(SAVED_TLDRS, '[]'));
+	var output = "[" + formatDate() + "] ";
+	for (var i = 0; i < ids.length; i++) {
+		output += tldrs[ids[i]]['title'] + '; ';
+	}
+	return output.slice(0, -2);	
+}
+
 /** Inserts saved links into the popup. The links are grouped by subreddit */
 function updatePopup(){
 	var stored = sortTldrs();
@@ -239,6 +260,12 @@ function updatePopup(){
 	}
 	var div = document.getElementById(POPUP_ID);
 	div.innerHTML = '';
+	var tldrTitle = document.createElement('div');
+	tldrTitle.id = "tldrTitle";
+	tldrTitle.innerHTML = formatTitle();
+	div.appendChild(tldrTitle);
+	tldrTitle.style.marginTop = "-40px";
+	tldrTitle.style.marginBottom = "20px";
 	var table = document.createElement('table');
 	table.style.fontSize = 'medium';
 	table.style.height = '' + (window.innerHeight * 0.65) + "px";
@@ -285,6 +312,26 @@ function updatePopup(){
 				}
 				var title = insertCell(innerTr, '<a href="'+stored[j]['link']+'">'+stored[j]['title']+'</a>');
 				title.style.width = "550px";
+				var savedTitle = JSON.parse(GM_getValue(TITLE, '[]'));
+				if (savedTitle.includes(stored[j]['id'])) {
+					var checked = 'checked';
+				} else if ((stored[j]['title'] + tldrTitle.innerHTML).length > 298) {
+					var checked = 'disabled';  // disables this checkbox if inserting in the title would exceed Reddit limit
+				} else {
+					var checked = '';
+				}
+				/* Inserts checkbox to add this title to the tldr title summary */
+				var checkbox = insertCell(innerTr, '<input type="checkbox" value="'+stored[j]['id']+'" '+checked+'>').firstChild;
+				checkbox.addEventListener('click', function () {
+					var saved = new Set(JSON.parse(GM_getValue(TITLE, '[]')));
+					if (this.checked) {
+						saved.add(this.value);
+					} else {
+						saved.delete(this.value);
+					}
+					GM_setValue(TITLE, JSON.stringify(Array.from(saved)));
+					updatePopup();				
+				});
 				insertCell(innerTr, '<a href="'+stored[j]['comments']+'">Comments</a>');
 				var removeBtn = insertCell(innerTr, '<a href="javascript: return false;">Remove</a>');
 				removeBtn.setAttribute('value', j);
@@ -308,6 +355,7 @@ function updatePopup(){
 	var clearButton = document.getElementById(CLEAR_BUTTON_ID);
 	clearButton.addEventListener("click", function () {
 		GM_setValue(SAVED_TLDRS, '{}');
+		GM_setValue(TITLE, '[]');
 		window.location.reload();
 	}, false);
 	/* Adds a selector for the subreddit of the day */
@@ -377,7 +425,7 @@ function formatPost(){
 					}
 				}
 			}
-			output += "&nbsp;\n\n---\n---\n";
+			output += "\n\n---\n\n";
 		}
 		output += "#Something New\n\nEveryday we’ll feature a selected small subreddit and its top content. It's a fun way to include and celebrate smaller subreddits.\n\n" +
 					"#Today's subreddit is...\n\n#/"+sotd+"\n\nIts top 3 all time posts\n\n";
@@ -387,8 +435,9 @@ function formatPost(){
 						"**" + response['children'][i]['data']['title'] + "**\n\n " +
 						"[**Comments**](" + response['children'][i]['data']['permalink'] + ") || [**Link**](" + response['children'][i]['data']['url'] + ")\n\n";            	
         }
-        output += "&nbsp;\n\n---\n---\n---";
+        output += "\n\n---\n\n---\n\n";
 		var textAreas = document.getElementsByTagName('textarea');
+		textAreas[0].value = formatTitle();
 		textAreas[1].value = output;
 	});	
 }

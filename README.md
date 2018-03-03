@@ -30,6 +30,10 @@ Special thanks to [/u/kaunis](https://www.reddit.com/user/kaunis) for testing th
 **A**: Feel free to submit a new issue here on the Github repo, otherwise just drop a message to my [Reddit account](https://www.reddit.com/user/nov4chip/)
 
 ## Changelog
+* **v0.2.1**
+  * Added checkboxes near each submission to add the post to the tdlr title. These checkboxes are disabled automatically if inserting this title would exceed Reddit title limit.
+  * Submission title field is now filled up automatically, respecting previous posts on r/tldr.
+  * Fixed horizontal rule formatting.
 * **v0.2.0**
   * Saving posts now performs a call to Reddit API, fixing a bug where comments link where not retrieved for final formatting. 
   * Buttons are now created before the page finishes loading.
