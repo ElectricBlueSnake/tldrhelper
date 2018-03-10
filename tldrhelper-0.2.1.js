@@ -105,7 +105,7 @@ function insertSubredditButton(subreddit){
 	}
 	document.getElementById('tldr-sotd').addEventListener("click", function () {
 		var sotd = GM_getValue(SOTD, null);
-		var arr = JSON.parse(GM_getValue(SAVED_SUBREDDITS, '[]'))
+		var arr = JSON.parse(GM_getValue(SAVED_SUBREDDITS, '[]'));
 		var savedSubs = new Set(arr);
 		var subreddit = this.getAttribute('value');
 		if (!sotd) {
@@ -132,7 +132,7 @@ function appendButtons(){
     var links = document.getElementsByClassName('link thing');
 	var match = /r\/\w+/g.exec(window.location);
 	if (match) {
-		insertSubredditButton(match[0]);
+		// insertSubredditButton(match[0]);
 	}
     for (var i = 0; i < links.length; i++){
         var id = /t3_\w+/g.exec(links[i].id)[0];
@@ -235,8 +235,7 @@ function createPopup(){
 function formatDate(){
 	var today = new Date();
 	var options = {weekday: 'long', month: 'long', year: 'numeric', day: 'numeric'};
-	var text = today.toLocaleDateString('en-US', options);
-	return text.slice(0, -6) + text.slice(text.length-5);
+	return today.toLocaleDateString('it-IT', options);
 }
 
 function formatTitle(){
@@ -363,8 +362,8 @@ function updatePopup(){
 	var select = document.createElement('select');
 	select.id = 'select-sotd';
 	select.style.float = 'right';
-	bottom.appendChild(select);
-	bottom.insertAdjacentHTML('beforeend', '<label style="float:right;padding-right: 5px">Subreddit of the day:</label>');
+	//bottom.appendChild(select);
+	//bottom.insertAdjacentHTML('beforeend', '<label style="float:right;padding-right: 5px">Subreddit of the day:</label>');
 	var chosen = GM_getValue(SOTD);
 	var savedSubs = JSON.parse(GM_getValue(SAVED_SUBREDDITS, '[]'));
 	for (var i = 0; i < savedSubs.length; i++) {
@@ -396,51 +395,39 @@ function hidePopup(){
 
 /** Returns the formatted post from the saved links */
 function formatPost(){
-	var match = /r\/tldr/g.exec(window.location.href);
+	var match = /r\/assegnastampa/g.exec(window.location.href);
 	if (!match || !window.location.href.includes("submit")) {
 		return;
 	}
-	var sotd = GM_getValue(SOTD, '');
-	var url = "https://www.reddit.com/" + sotd + "/top.json";
-	httpCall(url, {}, function (response) {
-		var output = "";
-		var stored = sortTldrs();
-		var subreddits = [];
-		for (var i = 0; i < stored.length; i++) {
-			if (!subreddits.includes(stored[i]['subreddit'])) {
-				subreddits.push(stored[i]['subreddit']);
-			}
+	var output = "";
+	var stored = sortTldrs();
+	var subreddits = [];
+	for (var i = 0; i < stored.length; i++) {
+		if (!subreddits.includes(stored[i]['subreddit'])) {
+			subreddits.push(stored[i]['subreddit']);
 		}
-		for (var i = 0; i < subreddits.length; i++) {
-			output += "#/" + subreddits[i] + "\n\n";
-			for (var j = 0; j < stored.length; j++) {
-				if (stored[j]['subreddit'] == subreddits[i]){
-					output += "- **/u/" + stored[j]['author'] + "**\n\n " +
-								"**" + stored[j]['title'] + "**\n\n ";
-					/* Saves some characters by not inserting the "link" section when there is no external link (self post) */
-					if (stored[j]['link'].includes(stored[j]['comments'])) {
-						output += "[**Comments**](" + stored[j]['comments'] + ")\n\n";
-					} else {
-						output += "[**Comments**](" + stored[j]['comments'] + ") || [**Link**](" + stored[j]['link'] + ")\n\n";
-					}
+	}
+	for (var i = 0; i < subreddits.length; i++) {
+		output += "#/" + subreddits[i] + "\n\n";
+		for (var j = 0; j < stored.length; j++) {
+			if (stored[j]['subreddit'] == subreddits[i]){
+				output += "- **/u/" + stored[j]['author'] + "**\n\n " +
+							"**" + stored[j]['title'] + "**\n\n ";
+				/* Saves some characters by not inserting the "link" section when there is no external link (self post) */
+				if (stored[j]['link'].includes(stored[j]['comments'])) {
+					output += "[**Comments**](" + stored[j]['comments'] + ")\n\n";
+				} else {
+					output += "[**Comments**](" + stored[j]['comments'] + ") || [**Link**](" + stored[j]['link'] + ")\n\n";
 				}
 			}
-			output += "\n\n---\n\n";
 		}
-		output += "#Something New\n\nEveryday we’ll feature a selected small subreddit and its top content. It's a fun way to include and celebrate smaller subreddits.\n\n" +
-					"#Today's subreddit is...\n\n#/"+sotd+"\n\nIts top 3 all time posts\n\n";
-    	var response = JSON.parse(response)['data'];
-        for (var i = 0; i < 3; i++) {
-			output += "- **/u/" + response['children'][i]['data']['author'] + "**\n\n " +
-						"**" + response['children'][i]['data']['title'] + "**\n\n " +
-						"[**Comments**](" + response['children'][i]['data']['permalink'] + ") || [**Link**](" + response['children'][i]['data']['url'] + ")\n\n";            	
-        }
-        output += "\n\n---\n\n---\n\n";
-		var textAreas = document.getElementsByTagName('textarea');
-		textAreas[0].value = formatTitle();
-		textAreas[1].value = output;
-	});	
-}
+		output += "\n\n---\n\n";
+	}
+	var textAreas = document.getElementsByTagName('textarea');
+	textAreas[0].value = formatTitle();
+	textAreas[1].value = output;
+}	
+
 
 /** Performs an HTTP get request and applies the callback function to the response received */
 function httpCall(url, params, callback){
